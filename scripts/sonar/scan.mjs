@@ -39,7 +39,7 @@ export async function scan(root) {
   await rm(output, { force: true });
   const properties = await readFile(resolve(root, 'sonar-project.properties'), 'utf8');
   const gitFiles = execFileSync(
-    'git',
+    '/usr/bin/git',
     ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
     {
       cwd: root,

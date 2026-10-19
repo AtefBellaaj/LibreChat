@@ -44,7 +44,10 @@ export function sourceFiles(files, properties) {
         /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) &&
         !exclusions.some((pattern) => matchesGlob(file, pattern)),
     )
-    .sort();
+    .sort((left, right) => {
+      if (left < right) return -1;
+      return left > right ? 1 : 0;
+    });
 }
 
 export function createReport() {

@@ -29,9 +29,10 @@ Its repository guard prevents it from running in upstream or another fork.
 
 ## Scan behavior
 
-Pushes to `dev` and PRs targeting `dev` trigger analysis. A manual run is allowed
-on `dev`. GitHub only exposes manual dispatch after the workflow also exists on
-the repository's default branch (`main`); the initial scan uses the `dev` push.
+Pushes to `dev` or `atef/sonarcloud`, and PRs targeting `dev`, trigger analysis.
+A manual run is allowed on either named branch. GitHub only exposes manual
+dispatch after the workflow also exists on the repository's default branch
+(`main`); the experiment starts from a push to `atef/sonarcloud`.
 Other manual branches and PRs from external forks are skipped. External
 fork PRs cannot access the repository secret. The workflow uses `pull_request`,
 not `pull_request_target`, and gives the GitHub token read access to contents only.
@@ -43,17 +44,35 @@ code. Dependencies, generated output, source maps, and reports are excluded.
 Git-ignored files also remain outside the scan under SonarQube's default behavior.
 
 The workflow installs an isolated complexity analyzer from `scripts/sonar` and
-tests its severity bands. It does not install application dependencies, execute
-the application, run Jest, or upload test coverage. Any
-coverage percentage or coverage-related quality-gate failure must not be read as
-a measurement of the existing test suites. A successful workflow means that the
+tests its severity bands. It uploads LCOV coverage from the analysis tool's Node
+tests. It does not install application dependencies, execute the application,
+or run Jest. Coverage for other source files is not measured by this workflow.
+A successful workflow means that the
 scanner submitted its report; inspect SonarQube for the processed result and
 quality gate. This setup does not change branch protection or require the quality
 gate for merging.
 
-The branch selection matches the repository's normal PR target, `dev`. Setting
-`dev` as the SonarQube main branch keeps this setup within the Free plan's branch
-restriction. Release pushes to `main` do not trigger a separate analysis.
+The SonarQube main branch stays `dev`, which matches the repository's normal PR
+target. Release pushes to `main` do not trigger a separate analysis.
+
+## Isolated experiment branch
+
+The `atef/sonarcloud` branch has its own full-code analysis. It does not need to
+merge into `dev`. This requires a SonarQube plan with branch-analysis access.
+
+Before the first branch scan, add `atef/sonarcloud` as an exact alternative to
+the project's existing long-lived branch name pattern. Keep the existing
+alternatives. SonarQube determines the branch type on its first analysis and
+does not change it when the pattern changes later.
+
+A push to `atef/sonarcloud` runs branch analysis. The scanner detects the branch
+from GitHub Actions. The separate PR event still reports issues introduced by
+the PR; its results do not replace the full branch report. The two runs use
+separate concurrency groups.
+
+In SonarQube, select `atef/sonarcloud`, open Issues, and filter the six imported
+cognitive and cyclomatic complexity rules. Include Low, Medium, and High. The
+`dev` view continues to show its own last scan and original complexity rules.
 
 ## Complexity severity bands
 
@@ -81,11 +100,12 @@ Local ESLint suppression comments do not suppress this experiment's findings.
 Parser errors stop report generation. A failed run removes the previous report
 so the scanner cannot import stale results.
 
-Run the tool from the repository root:
+Run the tool from the repository root on Linux or macOS with Node 24.16 or later.
+The scan uses `/usr/bin/git` so a writable directory in `PATH` cannot replace Git.
 
 ```sh
 npm ci --prefix scripts/sonar --ignore-scripts --no-audit --no-fund
-npm test --prefix scripts/sonar
+npm run test:coverage --prefix scripts/sonar
 npm run scan --prefix scripts/sonar
 ```
 
@@ -105,7 +125,9 @@ prevents duplicate High findings when the replacement workflow starts, without
 changing the live profiles ahead of deployment. To roll back, remove the four
 issue exclusions, the external report import, and its workflow steps together.
 
-These findings do not calculate a CRAP score. Test coverage is not imported.
+These findings do not calculate a CRAP score. Coverage is imported only for the
+analysis tool, from `.sonar/lcov.info`. Application test coverage requires running
+the application's test suites and importing their reports.
 
 ## References
 

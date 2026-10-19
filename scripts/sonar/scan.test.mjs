@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { analyze, scan } from './scan.mjs';
 import { addMessages, createReport } from './report.mjs';
 
@@ -38,7 +38,7 @@ test('real SonarJS rules classify JavaScript and TypeScript at each band edge', 
 test('a failed repository scan removes a stale report and never publishes partial findings', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sonar-bands-'));
   try {
-    execFileSync('git', ['init', '--quiet', root]);
+    execFileSync('/usr/bin/git', ['init', '--quiet', root]);
     await mkdir(join(root, '.sonar'));
     await writeFile(join(root, '.sonar/complexity.json'), '{"issues": []}');
     await writeFile(join(root, 'sonar-project.properties'), 'sonar.sources=.\nsonar.tests=.\n');
@@ -46,6 +46,50 @@ test('a failed repository scan removes a stale report and never publishes partia
     await assert.rejects(scan(root), /broken.ts/);
     await assert.rejects(access(join(root, '.sonar/complexity.json')), { code: 'ENOENT' });
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('repository scan uses system Git and publishes only included source findings', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'sonar-bands-'));
+  const originalPath = process.env.PATH;
+  try {
+    execFileSync('/usr/bin/git', ['init', '--quiet', root]);
+    await writeFile(
+      join(root, 'sonar-project.properties'),
+      'sonar.sources=.\nsonar.tests=.\nsonar.test.inclusions=**/*.test.*\n',
+    );
+    const source =
+      'export function example(x) {\n' +
+      Array.from({ length: 16 }, (_, i) => `if (x === ${i}) return ${i};`).join('\n') +
+      '\n}';
+    await writeFile(join(root, 'tracked.js'), source);
+    execFileSync('/usr/bin/git', ['-C', root, 'add', 'tracked.js']);
+    await writeFile(join(root, 'untracked source.ts'), source);
+    await writeFile(join(root, 'excluded.test.ts'), 'function {');
+    await writeFile(join(root, '.gitignore'), 'ignored.js\n');
+    await writeFile(join(root, 'ignored.js'), 'function {');
+    // A writable PATH entry must not replace the Git executable used by the scan.
+    await writeFile(join(root, 'git'), '#!/bin/sh\nexit 99\n');
+    await chmod(join(root, 'git'), 0o755);
+    process.env.PATH = root;
+
+    const report = await scan(root);
+    const published = JSON.parse(await readFile(join(root, '.sonar/complexity.json'), 'utf8'));
+    assert.deepEqual(published, report);
+    assert.equal(report.rules.length, 6);
+    assert.deepEqual(
+      report.issues.map((issue) => [issue.primaryLocation.filePath, issue.ruleId]),
+      [
+        ['tracked.js', 'cognitive-low'],
+        ['tracked.js', 'cyclomatic-low'],
+        ['untracked source.ts', 'cognitive-low'],
+        ['untracked source.ts', 'cyclomatic-low'],
+      ],
+    );
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
     await rm(root, { recursive: true, force: true });
   }
 });

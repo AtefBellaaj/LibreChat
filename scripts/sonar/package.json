@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test *.test.mjs",
+    "test:coverage": "cd ../.. && mkdir -p .sonar && node --test --experimental-test-coverage --test-coverage-include='scripts/sonar/**/*.mjs' --test-coverage-exclude='**/*.test.mjs' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=.sonar/lcov.info scripts/sonar/*.test.mjs",
     "scan": "node scan.mjs"
   },
   "dependencies": {
