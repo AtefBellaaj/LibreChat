@@ -1,0 +1,14 @@
+{
+  "name": "librechat-sonar-experiment",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test *.test.mjs",
+    "scan": "node scan.mjs"
+  },
+  "dependencies": {
+    "@typescript-eslint/parser": "8.71.2",
+    "eslint": "9.39.5",
+    "eslint-plugin-sonarjs": "4.2.2"
+  }
+}
