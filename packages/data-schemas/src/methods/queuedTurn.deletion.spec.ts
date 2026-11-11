@@ -12,11 +12,13 @@ jest.mock('~/config/winston', () => ({
   debug: jest.fn(),
 }));
 
-const models = createModels(mongoose);
-const methods = createMethods(mongoose);
+let models: ReturnType<typeof createModels>;
+let methods: ReturnType<typeof createMethods>;
 let mongoServer: MongoMemoryServer;
 
 beforeAll(async () => {
+  models = createModels(mongoose);
+  methods = createMethods(mongoose);
   mongoServer = await MongoMemoryServer.create();
   await mongoose.connect(mongoServer.getUri());
   await Promise.all(Object.values(models).map((model) => model.init()));

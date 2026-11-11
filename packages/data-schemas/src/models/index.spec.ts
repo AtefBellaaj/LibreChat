@@ -8,7 +8,11 @@ describe('index build diagnostics', () => {
   const instance = new mongoose.Mongoose();
   instance.set('autoIndex', false);
   instance.set('autoCreate', false);
-  const models = createModels(instance);
+  let models: ReturnType<typeof createModels>;
+
+  beforeAll(() => {
+    models = createModels(instance);
+  });
 
   afterEach(() => jest.restoreAllMocks());
 
