@@ -5,12 +5,11 @@ import { runAsSystem, tenantStorage } from '~/config/tenantContext';
 import { createModels } from '~/models';
 import { createMethods } from './index';
 
-createModels(mongoose);
-
 describe('conversation import cleanup methods', () => {
   let mongoServer: MongoMemoryServer;
 
   beforeAll(async () => {
+    createModels(mongoose);
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
   });
@@ -21,7 +20,7 @@ describe('conversation import cleanup methods', () => {
 
   afterAll(async () => {
     await mongoose.disconnect();
-    await mongoServer.stop();
+    await mongoServer?.stop();
   });
 
   it('removes only the generated IDs for the authenticated owner and tenant', async () => {
